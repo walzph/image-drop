@@ -2,20 +2,14 @@ schemaVersion: v0.2
 prepare:
   steps:
     - command: npm install
-    - command: npm build
+    - command: npm run build:frontend
 test:
   steps: []
 run:
-  backend:
+  production:
     steps:
-      - command: npm run server -- --host
-    plan: 8
-    replicas: 1
-    isPublic: false
-  frontend:
-    steps:
-      - command: npm run preview -- --host
-    plan: 8
+      - command: npm run start:production
+    plan: 9
     replicas: 1
     isPublic: true
     network:
