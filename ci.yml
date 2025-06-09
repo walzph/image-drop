@@ -1,0 +1,23 @@
+schemaVersion: v0.2
+prepare:
+  steps:
+    - command: npm install
+    - command: npm build
+test:
+  steps: []
+run:
+  backend:
+    steps:
+      - command: npm run server
+    plan: 8
+    replicas: 1
+    isPublic: false
+  frontend:
+    steps:
+      - command: npm run client
+    plan: 8
+    replicas: 1
+    isPublic: true
+    network:
+      path: /
+      stripPath: false
