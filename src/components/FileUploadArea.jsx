@@ -53,8 +53,7 @@ function FileUploadArea({ onFilesSelected }) {
         ref={fileInputRef}
         type="file" 
         multiple 
-        accept="image/*" 
-        capture="environment"
+accept="image/*,image/jpeg,image/png,image/heic,image/heif" 
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />

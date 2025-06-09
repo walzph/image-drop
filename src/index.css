@@ -75,11 +75,11 @@ body {
 
 @media (max-width: 768px) {
   .container {
-    padding: 20px;
+    padding: 10px;
   }
   
   .glass-container {
     padding: 20px;
-    margin: 20px;
+    margin: 0;
   }
 }

@@ -58,8 +58,7 @@ function ImagePreview({ files, onRemoveFile, onAddMore, onStartUpload, onCancel 
         ref={addMoreInputRef}
         type="file" 
         multiple 
-        accept="image/*" 
-        capture="environment"
+accept="image/*,image/jpeg,image/png,image/heic,image/heif" 
         style={{ display: 'none' }}
         onChange={handleAddMoreChange}
       />

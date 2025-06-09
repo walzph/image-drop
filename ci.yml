@@ -9,7 +9,7 @@ run:
   production:
     steps:
       - command: npm run start:production
-    plan: 9
+    plan: 10
     replicas: 1
     isPublic: true
     network:
