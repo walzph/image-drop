@@ -1,0 +1,22 @@
+{
+  "imageDrops": [
+    {
+      "name": "Wedding Photos",
+      "path": "wedding-photos",
+      "subdirectory": "uploads/wedding",
+      "backgroundImage": "/assets/wedding-bg.jpg"
+    },
+    {
+      "name": "Event Memories",
+      "path": "event-photos",
+      "subdirectory": "uploads/events",
+      "backgroundImage": "/assets/event-bg.jpg"
+    },
+    {
+      "name": "Family Gathering",
+      "path": "family-photos",
+      "subdirectory": "uploads/family",
+      "backgroundImage": "/assets/family-bg.jpg"
+    }
+  ]
+}
