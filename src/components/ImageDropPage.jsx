@@ -123,17 +123,26 @@ function ImageDropPage() {
     );
   }
 
-  const containerStyle = {
+  const pageStyle = {
     backgroundImage: imageDrop.backgroundImage ? 
       `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('${imageDrop.backgroundImage}')` : 
       'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    backgroundAttachment: 'fixed'
+    backgroundAttachment: 'fixed',
+    minHeight: '100vh',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1
   };
 
   return (
-    <div style={containerStyle} className="container">
+    <>
+      <div style={pageStyle}></div>
+      <div className="container">
       <div className="glass-container">
         <h1>{imageDrop.name}</h1>
         
@@ -160,6 +169,7 @@ function ImageDropPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

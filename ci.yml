@@ -8,13 +8,13 @@ test:
 run:
   backend:
     steps:
-      - command: npm run server
+      - command: npm run server -- --host
     plan: 8
     replicas: 1
     isPublic: false
   frontend:
     steps:
-      - command: npm run client
+      - command: npm run preview -- --host
     plan: 8
     replicas: 1
     isPublic: true
