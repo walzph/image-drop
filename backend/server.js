@@ -2,7 +2,6 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import sharp from 'sharp';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -93,48 +92,16 @@ app.post('/api/upload/:path', upload.array('images', 20), async (req, res) => {
   }
 
   try {
-    const processedFiles = [];
-    
-    for (const file of req.files) {
-      try {
-        const image = sharp(file.path);
-        const metadata = await image.metadata();
-        
-        // Process image while preserving metadata
-        await image
-          .withMetadata()
-          .toFile(file.path + '.processed');
-        
-        fs.unlinkSync(file.path);
-        fs.renameSync(file.path + '.processed', file.path);
-        
-        processedFiles.push({
-          filename: file.filename,
-          originalname: file.originalname,
-          size: file.size,
-          metadata: {
-            width: metadata.width,
-            height: metadata.height,
-            format: metadata.format,
-            hasProfile: metadata.hasProfile,
-            hasAlpha: metadata.hasAlpha
-          }
-        });
-      } catch (error) {
-        console.error(`Error processing ${file.filename}:`, error);
-        processedFiles.push({
-          filename: file.filename,
-          originalname: file.originalname,
-          size: file.size,
-          error: 'Processing failed, file saved without metadata preservation'
-        });
-      }
-    }
+    const uploadedFiles = req.files.map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      size: file.size
+    }));
 
     res.json({ 
       message: 'Files uploaded successfully',
       fileCount: req.files.length,
-      files: processedFiles
+      files: uploadedFiles
     });
   } catch (error) {
     console.error('Upload error:', error);
