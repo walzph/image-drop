@@ -1,6 +1,8 @@
 schemaVersion: v0.2
 prepare:
   steps:
+    - command: sudo n install 22
+    - command: sudo npm install -g @anthropic-ai/claude-code
     - command: npm install
     - command: npm run build:frontend
 test:
@@ -8,8 +10,9 @@ test:
 run:
   production:
     steps:
+      - command: sudo n install 22
       - command: npm run start:production
-    plan: 10
+    plan: 8
     replicas: 1
     isPublic: true
     network:

@@ -3,12 +3,13 @@ import { useParams } from 'react-router-dom';
 import FileUploadArea from './FileUploadArea';
 import ImagePreview from './ImagePreview';
 import UploadProgress from './UploadProgress';
+import Gallery from './Gallery';
 
 function ImageDropPage() {
   const { dropPath } = useParams();
   const [imageDrop, setImageDrop] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploadState, setUploadState] = useState('select'); // 'select', 'preview', 'uploading', 'complete'
+  const [uploadState, setUploadState] = useState('gallery'); // 'gallery', 'select', 'preview', 'uploading', 'complete'
   const [uploadProgress, setUploadProgress] = useState([]);
   const [error, setError] = useState(null);
 
@@ -29,6 +30,47 @@ function ImageDropPage() {
     }
   };
 
+  const handleAddImages = () => {
+    setUploadState('select');
+  };
+
+  const handleDownload = async (selectedImageFilenames) => {
+    try {
+      const response = await fetch(`/api/download/${dropPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filenames: selectedImageFilenames }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Download failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dropPath}-images.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(`Failed to download images: ${error.message}`);
+      throw error;
+    }
+  };
+
+  const handleBackToGallery = () => {
+    setUploadState('gallery');
+    setSelectedFiles([]);
+    setUploadProgress([]);
+  };
+
   const handleFilesSelected = (files) => {
     setSelectedFiles(files);
     setUploadState('preview');
@@ -47,7 +89,7 @@ function ImageDropPage() {
     setSelectedFiles(newFiles);
     
     if (newFiles.length === 0) {
-      setUploadState('select');
+      setUploadState('gallery');
     }
   };
 
@@ -97,13 +139,13 @@ function ImageDropPage() {
 
   const handleReset = () => {
     setSelectedFiles([]);
-    setUploadState('select');
+    setUploadState('gallery');
     setUploadProgress([]);
   };
 
   const handleCancel = () => {
     setSelectedFiles([]);
-    setUploadState('select');
+    setUploadState('gallery');
   };
 
   if (error) {
@@ -146,18 +188,36 @@ function ImageDropPage() {
       <div className="glass-container">
         <h1>{imageDrop.name}</h1>
         
+        {uploadState === 'gallery' && (
+          <Gallery 
+            dropPath={dropPath}
+            onAddImages={handleAddImages}
+            onDownload={handleDownload}
+          />
+        )}
+        
         {uploadState === 'select' && (
-          <FileUploadArea onFilesSelected={handleFilesSelected} />
+          <>
+            <button className="btn btn-secondary" onClick={handleBackToGallery} style={{ marginBottom: '20px' }}>
+              ← Back to Gallery
+            </button>
+            <FileUploadArea onFilesSelected={handleFilesSelected} />
+          </>
         )}
         
         {uploadState === 'preview' && (
-          <ImagePreview 
-            files={selectedFiles}
-            onRemoveFile={handleRemoveFile}
-            onAddMore={handleAddMoreFiles}
-            onStartUpload={handleStartUpload}
-            onCancel={handleCancel}
-          />
+          <>
+            <button className="btn btn-secondary" onClick={handleBackToGallery} style={{ marginBottom: '20px' }}>
+              ← Back to Gallery
+            </button>
+            <ImagePreview 
+              files={selectedFiles}
+              onRemoveFile={handleRemoveFile}
+              onAddMore={handleAddMoreFiles}
+              onStartUpload={handleStartUpload}
+              onCancel={handleCancel}
+            />
+          </>
         )}
         
         {(uploadState === 'uploading' || uploadState === 'complete') && (
