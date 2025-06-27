@@ -69,9 +69,12 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
     return (
       <div className="gallery-error">
         <p>Error: {error}</p>
-        <button className="btn btn-secondary" onClick={fetchImages}>
-          Try Again
-        </button>
+        <div className="button-row">
+          <button className="btn btn-secondary" onClick={fetchImages}>
+            <span className="btn-icon">🔄</span>
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -80,25 +83,32 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
     <div className="gallery-container">
       <div className="gallery-header">
         <h2>Gallery ({images.length} images)</h2>
-        <button className="btn" onClick={onAddImages}>
-          Add Your Images
-        </button>
+        <div className="button-row">
+          <button className="btn" onClick={onAddImages}>
+            <span className="btn-icon">📷</span>
+            Add Your Images
+          </button>
+        </div>
       </div>
 
       {images.length === 0 ? (
         <div className="gallery-empty">
           <p>No images uploaded yet</p>
-          <button className="btn" onClick={onAddImages}>
-            Upload First Images
-          </button>
+          <div className="button-row">
+            <button className="btn" onClick={onAddImages}>
+              <span className="btn-icon">📸</span>
+              Upload First Images
+            </button>
+          </div>
         </div>
       ) : (
         <>
-          <div className="gallery-controls">
+          <div className="button-row gallery-controls">
             <button 
               className="btn btn-secondary" 
               onClick={handleSelectAll}
             >
+              <span className="btn-icon">{selectedImages.length === images.length ? '☑️' : '☐'}</span>
               {selectedImages.length === images.length ? 'Deselect All' : 'Select All'}
             </button>
             {selectedImages.length > 0 && (
@@ -113,7 +123,10 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
                     Preparing Download...
                   </>
                 ) : (
-                  `Download Selected (${selectedImages.length})`
+                  <>
+                    <span className="btn-icon">💾</span>
+                    Download ({selectedImages.length})
+                  </>
                 )}
               </button>
             )}
@@ -127,7 +140,7 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
                 onClick={() => handleImageSelect(image.filename)}
               >
                 <img 
-                  src={image.url} 
+                  src={image.thumbnailUrl || image.url} 
                   alt={image.filename}
                   className="gallery-image"
                   loading="lazy"

@@ -12,7 +12,7 @@ run:
     steps:
       - command: sudo n install 22
       - command: npm run start:production
-    plan: 8
+    plan: 9
     replicas: 1
     isPublic: true
     network:

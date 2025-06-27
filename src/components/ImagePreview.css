@@ -60,26 +60,12 @@
 }
 
 .upload-controls {
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  margin-top: 15px;
 }
 
 @media (max-width: 768px) {
   .preview-grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
-  }
-  
-  .upload-controls {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .upload-controls .btn {
-    width: 100%;
-    max-width: 200px;
   }
 }

@@ -7,12 +7,17 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import archiver from 'archiver';
 import rateLimit from 'express-rate-limit';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
+
+// Trust proxy for rate limiting (required for proper IP detection)
+// Must be set before any rate limiting middleware
+app.set('trust proxy', 1);
 
 // Load configuration
 const configPath = path.join(__dirname, '..', 'config.json');
@@ -46,6 +51,26 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Track active uploads to prevent resource exhaustion
+const activeUploads = new Map();
+
+// Helper function to create thumbnail
+async function createThumbnail(inputPath, outputPath, maxSize = 300) {
+  try {
+    await sharp(inputPath)
+      .resize(maxSize, maxSize, {
+        fit: 'inside',
+        withoutEnlargement: false
+      })
+      .jpeg({ quality: 85 })
+      .toFile(outputPath);
+    return true;
+  } catch (error) {
+    console.error('Thumbnail creation failed:', error);
+    return false;
+  }
+}
+
 // Serve React static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'dist')));
@@ -64,6 +89,12 @@ const storage = multer.diskStorage({
     const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    // Create thumbnails directory
+    const thumbDir = path.join(uploadDir, 'thumbnails');
+    if (!fs.existsSync(thumbDir)) {
+      fs.mkdirSync(thumbDir, { recursive: true });
     }
     
     cb(null, uploadDir);
@@ -85,8 +116,17 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 50 * 1024 * 1024 // 50MB limit - increased for high res images
   }
+});
+
+// Rate limiting for uploads
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 upload requests per windowMs
+  message: { error: 'Too many upload requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // API Routes
@@ -114,6 +154,7 @@ app.get('/api/images/:path', (req, res) => {
   }
 
   const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
+  const thumbDir = path.join(uploadDir, 'thumbnails');
   
   if (!fs.existsSync(uploadDir)) {
     return res.json({ images: [] });
@@ -124,14 +165,18 @@ app.get('/api/images/:path', (req, res) => {
     const imageFiles = files
       .filter(file => {
         const ext = path.extname(file).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
+        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) && file !== 'thumbnails';
       })
       .map(file => {
         const filePath = path.join(uploadDir, file);
         const stats = fs.statSync(filePath);
+        const thumbPath = path.join(thumbDir, file.replace(path.extname(file), '.jpg'));
+        const hasThumbnail = fs.existsSync(thumbPath);
+        
         return {
           filename: file,
           url: `/uploads/${path.basename(imageDrop.subdirectory)}/${file}`,
+          thumbnailUrl: hasThumbnail ? `/uploads/${path.basename(imageDrop.subdirectory)}/thumbnails/${file.replace(path.extname(file), '.jpg')}` : null,
           size: stats.size,
           uploadedAt: stats.mtime
         };
@@ -229,8 +274,17 @@ app.post('/api/download/:path', downloadLimiter, express.json(), (req, res) => {
   archive.finalize();
 });
 
-app.post('/api/upload/:path', upload.array('images', 20), async (req, res) => {
+app.post('/api/upload/:path', uploadLimiter, upload.array('images', 20), async (req, res) => {
   const dropPath = req.params.path;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const uploadKey = `${clientIP}-${dropPath}`;
+  
+  // Check concurrent uploads
+  const currentUploads = activeUploads.get(uploadKey) || 0;
+  if (currentUploads >= 3) {
+    return res.status(429).json({ error: 'Too many concurrent uploads. Please wait.' });
+  }
+  
   const imageDrop = config.imageDrops.find(drop => drop.path === dropPath);
   
   if (!imageDrop) {
@@ -241,19 +295,54 @@ app.post('/api/upload/:path', upload.array('images', 20), async (req, res) => {
     return res.status(400).json({ error: 'No files uploaded' });
   }
 
-  try {
-    const uploadedFiles = req.files.map(file => ({
-      filename: file.filename,
-      originalname: file.originalname,
-      size: file.size
-    }));
+  // Track this upload
+  activeUploads.set(uploadKey, currentUploads + 1);
+  
+  const cleanup = () => {
+    const current = activeUploads.get(uploadKey) || 1;
+    if (current <= 1) {
+      activeUploads.delete(uploadKey);
+    } else {
+      activeUploads.set(uploadKey, current - 1);
+    }
+  };
 
+  try {
+    const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
+    const thumbDir = path.join(uploadDir, 'thumbnails');
+    
+    // Process files and create thumbnails
+    const processedFiles = [];
+    
+    for (const file of req.files) {
+      try {
+        const filePath = file.path;
+        const thumbPath = path.join(thumbDir, file.filename.replace(path.extname(file.filename), '.jpg'));
+        
+        // Create thumbnail asynchronously (don't wait for it to complete upload response)
+        createThumbnail(filePath, thumbPath).catch(err => {
+          console.error(`Failed to create thumbnail for ${file.filename}:`, err);
+        });
+        
+        processedFiles.push({
+          filename: file.filename,
+          originalname: file.originalname,
+          size: file.size
+        });
+      } catch (error) {
+        console.error(`Error processing file ${file.originalname}:`, error);
+      }
+    }
+
+    cleanup();
+    
     res.json({ 
       message: 'Files uploaded successfully',
-      fileCount: req.files.length,
-      files: uploadedFiles
+      fileCount: processedFiles.length,
+      files: processedFiles
     });
   } catch (error) {
+    cleanup();
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Upload processing failed' });
   }

@@ -42,14 +42,17 @@ function ImagePreview({ files, onRemoveFile, onAddMore, onStartUpload, onCancel 
         ))}
       </div>
       
-      <div className="upload-controls">
+      <div className="button-row upload-controls">
         <button className="btn" onClick={onStartUpload}>
+          <span className="btn-icon">☁️</span>
           Upload Images
         </button>
         <button className="btn btn-secondary" onClick={handleAddMoreClick}>
+          <span className="btn-icon">➕</span>
           Add More
         </button>
         <button className="btn btn-secondary" onClick={onCancel}>
+          <span className="btn-icon">✖️</span>
           Cancel
         </button>
       </div>
