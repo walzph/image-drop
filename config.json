@@ -1,10 +1,10 @@
 {
   "imageDrops": [
     {
-      "name": "Wedding Photos",
-      "path": "wedding-photos",
-      "subdirectory": "uploads/wedding",
-      "backgroundImage": "/assets/wedding-bg.jpg"
+      "name": "Hochzeit Verena & Stefan",
+      "path": "verena-stefan",
+      "subdirectory": "uploads/verena-stefan",
+      "backgroundImage": "/assets/verena-stefan.webp"
     },
     {
       "name": "Event Memories",

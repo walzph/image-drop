@@ -103,13 +103,15 @@ app.get('/:path', (req, res) => {
     return res.status(404).send('Image drop not found');
   }
 
+  const escapedName = imageDrop.name.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${imageDrop.name} - Upload Images</title>
+        <title>${escapedName} - Upload Images</title>
         <style>
             * {
                 margin: 0;
@@ -332,7 +334,7 @@ app.get('/:path', (req, res) => {
     </head>
     <body>
         <div class="upload-container">
-            <h1>${imageDrop.name}</h1>
+            <h1>${escapedName}</h1>
             
             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                 <div class="upload-icon">📱</div>
@@ -341,12 +343,14 @@ app.get('/:path', (req, res) => {
             </div>
             
             <input type="file" id="fileInput" multiple accept="image/*" capture="environment">
+            <input type="file" id="addMoreInput" multiple accept="image/*" capture="environment" style="display: none;">
             
             <div class="preview-container">
                 <h3>Selected Images</h3>
                 <div class="preview-grid"></div>
                 <div class="upload-controls">
                     <button class="btn" onclick="startUpload()">Upload Images</button>
+                    <button class="btn btn-secondary" onclick="addMoreImages()">Add More</button>
                     <button class="btn btn-secondary" onclick="cancelSelection()">Cancel</button>
                 </div>
             </div>
@@ -367,6 +371,7 @@ app.get('/:path', (req, res) => {
 
         <script>
             const fileInput = document.getElementById('fileInput');
+            const addMoreInput = document.getElementById('addMoreInput');
             const uploadArea = document.querySelector('.upload-area');
             const previewContainer = document.querySelector('.preview-container');
             const previewGrid = document.querySelector('.preview-grid');
@@ -396,8 +401,23 @@ app.get('/:path', (req, res) => {
                 handleFiles(e.target.files);
             });
             
-            function handleFiles(files) {
-                selectedFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            addMoreInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files, true);
+                addMoreInput.value = '';
+            });
+            
+            function handleFiles(files, append = false) {
+                const newFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+                
+                if (append) {
+                    // Filter out duplicates based on name and size
+                    const existingFileKeys = selectedFiles.map(f => `${f.name}-${f.size}`);
+                    const uniqueNewFiles = newFiles.filter(f => !existingFileKeys.includes(`${f.name}-${f.size}`));
+                    selectedFiles = [...selectedFiles, ...uniqueNewFiles];
+                } else {
+                    selectedFiles = newFiles;
+                }
+                
                 if (selectedFiles.length > 0) {
                     showPreview();
                 }
@@ -441,9 +461,14 @@ app.get('/:path', (req, res) => {
                 }
             }
             
+            function addMoreImages() {
+                addMoreInput.click();
+            }
+            
             function cancelSelection() {
                 selectedFiles = [];
                 fileInput.value = '';
+                addMoreInput.value = '';
                 uploadArea.style.display = 'block';
                 previewContainer.style.display = 'none';
                 previewGrid.innerHTML = '';
@@ -463,16 +488,16 @@ app.get('/:path', (req, res) => {
                     const file = selectedFiles[i];
                     const fileItem = document.createElement('div');
                     fileItem.className = 'file-item';
-                    fileItem.textContent = \`📸 \${file.name} - Uploading...\`;
+                    fileItem.textContent = '📸 ' + file.name + ' - Uploading...';
                     fileList.appendChild(fileItem);
                     
                     try {
                         await uploadSingleFile(file);
-                        fileItem.textContent = \`✅ \${file.name} - Complete\`;
+                        fileItem.textContent = '✅ ' + file.name + ' - Complete';
                         completed++;
-                        progressFill.style.width = \`\${(completed / total) * 100}%\`;
+                        progressFill.style.width = ((completed / total) * 100) + '%';
                     } catch (error) {
-                        fileItem.textContent = \`❌ \${file.name} - Failed\`;
+                        fileItem.textContent = '❌ ' + file.name + ' - Failed';
                     }
                 }
                 
@@ -508,6 +533,7 @@ app.get('/:path', (req, res) => {
             function resetUpload() {
                 selectedFiles = [];
                 fileInput.value = '';
+                addMoreInput.value = '';
                 uploadArea.style.display = 'block';
                 previewContainer.style.display = 'none';
                 progressContainer.style.display = 'none';
