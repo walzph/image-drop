@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import FileUploadArea from './FileUploadArea';
 import ImagePreview from './ImagePreview';
 import UploadProgress from './UploadProgress';
@@ -252,7 +253,7 @@ function ImageDropPage() {
           <>
             <div className="button-row" style={{ marginBottom: '15px' }}>
               <button className="btn btn-secondary" onClick={handleBackToGallery}>
-                <span className="btn-icon">←</span>
+                <ArrowLeft className="btn-icon" size={16} />
                 Back to Gallery
               </button>
             </div>
@@ -264,7 +265,7 @@ function ImageDropPage() {
           <>
             <div className="button-row" style={{ marginBottom: '15px' }}>
               <button className="btn btn-secondary" onClick={handleBackToGallery}>
-                <span className="btn-icon">←</span>
+                <ArrowLeft className="btn-icon" size={16} />
                 Back to Gallery
               </button>
             </div>
