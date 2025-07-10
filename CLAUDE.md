@@ -63,7 +63,7 @@ Note: The `subdirectory` field was removed when switching to S3 storage. Files a
 - **EXIF Preservation**: Sharp.js processes images while retaining metadata
 - **Mobile Optimization**: `capture="environment"` for camera access
 - **Duplicate Prevention**: Files checked by name and size when adding more
-- **Rate Limiting**: Upload and download endpoints have rate limiting protection
+- **Rate Limiting**: Download endpoint has relaxed rate limiting (20/min); upload rate limiting removed for S3 scalability
 
 ### State Management
 The upload flow uses a state machine in ImageDropPage:

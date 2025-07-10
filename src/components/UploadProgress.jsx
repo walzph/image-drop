@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Camera, Square, X, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, Camera, X, Clock, AlertCircle } from 'lucide-react';
 import './UploadProgress.css';
 
 function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }) {
@@ -16,7 +16,7 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
           <div className="button-row">
             <button className="btn" onClick={onReset}>
               <Camera className="btn-icon" size={16} />
-              Upload More Images
+              Back to Gallery
             </button>
           </div>
         </div>
@@ -34,8 +34,8 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
       {isUploading && onCancel && (
         <div className="button-row" style={{ marginBottom: '15px' }}>
           <button className="btn btn-secondary" onClick={onCancel}>
-            <Square className="btn-icon" size={16} />
-            Cancel Upload
+            <X className="btn-icon" size={16} />
+            Cancel
           </button>
         </div>
       )}
@@ -55,7 +55,7 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
               {item.status === 'uploading' && <Camera size={16} />}
               {item.status === 'complete' && <CheckCircle size={16} />}
               {item.status === 'failed' && <AlertCircle size={16} />}
-              {item.status === 'cancelled' && <Square size={16} />}
+              {item.status === 'cancelled' && <X size={16} />}
             </span>
             <span className="file-name">{item.name}</span>
             <span className="file-status">{item.message}</span>

@@ -44,10 +44,10 @@ app.use(cors());
 app.use(express.json());
 // S3 static file serving no longer needed - images served directly from S3
 
-// Rate limiting for download endpoint
+// Rate limiting for download endpoint - relaxed for S3 backend
 const downloadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 3, // limit each IP to 3 download requests per windowMs
+  max: 20, // limit each IP to 20 download requests per windowMs
   message: { error: 'Too many download requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -127,14 +127,7 @@ const upload = multer({
   }
 });
 
-// Rate limiting for uploads
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // limit each IP to 10 upload requests per windowMs
-  message: { error: 'Too many upload requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Upload rate limiting removed for S3 backend - only concurrent upload protection remains
 
 // API Routes
 app.get('/api/config', (req, res) => {
@@ -295,7 +288,7 @@ app.post('/api/download/:path', downloadLimiter, express.json(), async (req, res
   }
 });
 
-app.post('/api/upload/:path', uploadLimiter, upload.array('images', 20), async (req, res) => {
+app.post('/api/upload/:path', upload.array('images', 20), async (req, res) => {
   const dropPath = req.params.path;
   const clientIP = req.ip || req.connection.remoteAddress;
   const uploadKey = `${clientIP}-${dropPath}`;
