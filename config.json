@@ -1,22 +1,14 @@
 {
   "imageDrops": [
     {
+      "name": "Test Image Drop",
+      "path": "e744431f-b026-49a9-8aea-d3be177476bc",
+      "backgroundImage": "/assets/bubbles-bg.jpg"
+    },
+    {
       "name": "Hochzeit Verena & Stefan",
-      "path": "verena-stefan",
-      "subdirectory": "uploads/verena-stefan",
-      "backgroundImage": "/assets/verena-stefan.webp"
-    },
-    {
-      "name": "Event Memories",
-      "path": "event-photos",
-      "subdirectory": "uploads/events",
-      "backgroundImage": "/assets/event-bg.jpg"
-    },
-    {
-      "name": "Family Gathering",
-      "path": "family-photos",
-      "subdirectory": "uploads/family",
-      "backgroundImage": "/assets/family-bg.jpg"
+      "path": "565a311c-051d-4917-9156-8f21b205eba4",
+      "backgroundImage": "/assets/verena-stefan.jpg"
     }
   ]
 }

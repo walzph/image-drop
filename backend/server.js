@@ -8,12 +8,29 @@ import { dirname } from 'path';
 import archiver from 'archiver';
 import rateLimit from 'express-rate-limit';
 import sharp from 'sharp';
+import AWS from 'aws-sdk';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
+
+// Configure AWS S3 for Hetzner Object Storage
+const s3 = new AWS.S3({
+  endpoint: process.env.S3_ENDPOINT,
+  accessKeyId: process.env.S3_ACCESS_KEY,
+  secretAccessKey: process.env.S3_SECRET_KEY,
+  s3ForcePathStyle: true,
+  signatureVersion: 'v4',
+  region: 'us-east-1' // Required for Hetzner compatibility
+});
+
+const S3_BUCKET = process.env.S3_BUCKET || 'image-drop-bucket';
 
 // Trust proxy for rate limiting (required for proper IP detection)
 // Must be set before any rate limiting middleware
@@ -25,12 +42,12 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// S3 static file serving no longer needed - images served directly from S3
 
-// Rate limiting for download endpoint
+// Rate limiting for download endpoint - relaxed for S3 backend
 const downloadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 3, // limit each IP to 3 download requests per windowMs
+  max: 20, // limit each IP to 20 download requests per windowMs
   message: { error: 'Too many download requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -54,21 +71,40 @@ setInterval(() => {
 // Track active uploads to prevent resource exhaustion
 const activeUploads = new Map();
 
-// Helper function to create thumbnail
-async function createThumbnail(inputPath, outputPath, maxSize = 300) {
+// Helper function to create thumbnail and upload to S3
+async function createThumbnailAndUpload(imageBuffer, s3Key, maxSize = 300) {
   try {
-    await sharp(inputPath)
+    const thumbnailBuffer = await sharp(imageBuffer)
       .resize(maxSize, maxSize, {
         fit: 'inside',
         withoutEnlargement: false
       })
       .jpeg({ quality: 85 })
-      .toFile(outputPath);
-    return true;
+      .toBuffer();
+    
+    const thumbnailKey = s3Key.replace(/\.[^/.]+$/, '') + '-thumb.jpg';
+    
+    await s3.upload({
+      Bucket: S3_BUCKET,
+      Key: thumbnailKey,
+      Body: thumbnailBuffer,
+      ContentType: 'image/jpeg'
+    }).promise();
+    
+    return thumbnailKey;
   } catch (error) {
     console.error('Thumbnail creation failed:', error);
-    return false;
+    return null;
   }
+}
+
+// Helper function to get S3 object URL
+function getS3Url(key) {
+  return s3.getSignedUrl('getObject', {
+    Bucket: S3_BUCKET,
+    Key: key,
+    Expires: 3600 // 1 hour
+  });
 }
 
 // Serve React static files in production
@@ -76,38 +112,9 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'dist')));
 }
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dropPath = req.params.path;
-    const imageDrop = config.imageDrops.find(drop => drop.path === dropPath);
-    
-    if (!imageDrop) {
-      return cb(new Error('Invalid image drop path'));
-    }
-
-    const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    // Create thumbnails directory
-    const thumbDir = path.join(uploadDir, 'thumbnails');
-    if (!fs.existsSync(thumbDir)) {
-      fs.mkdirSync(thumbDir, { recursive: true });
-    }
-    
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const dropPath = req.params.path;
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, dropPath + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configure multer for S3 uploads (memory storage)
 const upload = multer({ 
-  storage: storage,
+  storage: multer.memoryStorage(),
   fileFilter: function (req, file, cb) {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -120,14 +127,7 @@ const upload = multer({
   }
 });
 
-// Rate limiting for uploads
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // limit each IP to 10 upload requests per windowMs
-  message: { error: 'Too many upload requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Upload rate limiting removed for S3 backend - only concurrent upload protection remains
 
 // API Routes
 app.get('/api/config', (req, res) => {
@@ -145,7 +145,7 @@ app.get('/api/drops/:path', (req, res) => {
   res.json(imageDrop);
 });
 
-app.get('/api/images/:path', (req, res) => {
+app.get('/api/images/:path', async (req, res) => {
   const dropPath = req.params.path;
   const imageDrop = config.imageDrops.find(drop => drop.path === dropPath);
   
@@ -153,44 +153,47 @@ app.get('/api/images/:path', (req, res) => {
     return res.status(404).json({ error: 'Image drop not found' });
   }
 
-  const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
-  const thumbDir = path.join(uploadDir, 'thumbnails');
-  
-  if (!fs.existsSync(uploadDir)) {
-    return res.json({ images: [] });
-  }
-
   try {
-    const files = fs.readdirSync(uploadDir);
-    const imageFiles = files
-      .filter(file => {
-        const ext = path.extname(file).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) && file !== 'thumbnails';
+    const params = {
+      Bucket: S3_BUCKET,
+      Prefix: `${dropPath}/`
+    };
+
+    const data = await s3.listObjectsV2(params).promise();
+    
+    if (!data.Contents) {
+      return res.json({ images: [] });
+    }
+
+    const imageFiles = data.Contents
+      .filter(obj => {
+        const key = obj.Key;
+        const ext = path.extname(key).toLowerCase();
+        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) && !key.includes('-thumb.');
       })
-      .map(file => {
-        const filePath = path.join(uploadDir, file);
-        const stats = fs.statSync(filePath);
-        const thumbPath = path.join(thumbDir, file.replace(path.extname(file), '.jpg'));
-        const hasThumbnail = fs.existsSync(thumbPath);
+      .map(obj => {
+        const filename = path.basename(obj.Key);
+        const thumbKey = obj.Key.replace(/\.[^/.]+$/, '') + '-thumb.jpg';
         
         return {
-          filename: file,
-          url: `/uploads/${path.basename(imageDrop.subdirectory)}/${file}`,
-          thumbnailUrl: hasThumbnail ? `/uploads/${path.basename(imageDrop.subdirectory)}/thumbnails/${file.replace(path.extname(file), '.jpg')}` : null,
-          size: stats.size,
-          uploadedAt: stats.mtime
+          filename: filename,
+          key: obj.Key,
+          url: getS3Url(obj.Key),
+          thumbnailUrl: getS3Url(thumbKey),
+          size: obj.Size,
+          uploadedAt: obj.LastModified
         };
       })
       .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
     res.json({ images: imageFiles });
   } catch (error) {
-    console.error('Error reading images:', error);
+    console.error('Error reading images from S3:', error);
     res.status(500).json({ error: 'Failed to load images' });
   }
 });
 
-app.post('/api/download/:path', downloadLimiter, express.json(), (req, res) => {
+app.post('/api/download/:path', downloadLimiter, express.json(), async (req, res) => {
   const dropPath = req.params.path;
   const { filenames } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
@@ -216,8 +219,6 @@ app.post('/api/download/:path', downloadLimiter, express.json(), (req, res) => {
     return res.status(400).json({ error: 'Too many files selected. Maximum 50 files per download.' });
   }
 
-  const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
-  
   // Mark this download as active
   activeDownloads.set(downloadKey, Date.now());
   
@@ -248,33 +249,46 @@ app.post('/api/download/:path', downloadLimiter, express.json(), (req, res) => {
   archive.pipe(res);
 
   let filesAdded = 0;
-  filenames.forEach(filename => {
-    const filePath = path.join(uploadDir, filename);
-    if (fs.existsSync(filePath)) {
+  
+  try {
+    for (const filename of filenames) {
+      const s3Key = `${dropPath}/${filename}`;
+      
       try {
-        const stats = fs.statSync(filePath);
+        const s3Object = await s3.getObject({
+          Bucket: S3_BUCKET,
+          Key: s3Key
+        }).promise();
+        
         // Skip files larger than 100MB to prevent memory issues
-        if (stats.size > 100 * 1024 * 1024) {
-          console.warn(`Skipping large file: ${filename} (${stats.size} bytes)`);
-          return;
+        if (s3Object.ContentLength > 100 * 1024 * 1024) {
+          console.warn(`Skipping large file: ${filename} (${s3Object.ContentLength} bytes)`);
+          continue;
         }
-        archive.file(filePath, { name: filename });
+        
+        archive.append(s3Object.Body, { name: filename });
         filesAdded++;
       } catch (err) {
-        console.error(`Error adding file ${filename}:`, err);
+        console.error(`Error getting file ${filename} from S3:`, err);
       }
     }
-  });
 
-  if (filesAdded === 0) {
+    if (filesAdded === 0) {
+      cleanup();
+      return res.status(404).json({ error: 'No valid files found for download' });
+    }
+
+    archive.finalize();
+  } catch (error) {
     cleanup();
-    return res.status(404).json({ error: 'No valid files found for download' });
+    console.error('Download error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create download' });
+    }
   }
-
-  archive.finalize();
 });
 
-app.post('/api/upload/:path', uploadLimiter, upload.array('images', 20), async (req, res) => {
+app.post('/api/upload/:path', upload.array('images', 20), async (req, res) => {
   const dropPath = req.params.path;
   const clientIP = req.ip || req.connection.remoteAddress;
   const uploadKey = `${clientIP}-${dropPath}`;
@@ -308,26 +322,34 @@ app.post('/api/upload/:path', uploadLimiter, upload.array('images', 20), async (
   };
 
   try {
-    const uploadDir = path.join(__dirname, '..', imageDrop.subdirectory);
-    const thumbDir = path.join(uploadDir, 'thumbnails');
-    
-    // Process files and create thumbnails
     const processedFiles = [];
     
     for (const file of req.files) {
       try {
-        const filePath = file.path;
-        const thumbPath = path.join(thumbDir, file.filename.replace(path.extname(file.filename), '.jpg'));
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = dropPath + '-' + uniqueSuffix + path.extname(file.originalname);
+        const s3Key = `${dropPath}/${filename}`;
         
-        // Create thumbnail asynchronously (don't wait for it to complete upload response)
-        createThumbnail(filePath, thumbPath).catch(err => {
-          console.error(`Failed to create thumbnail for ${file.filename}:`, err);
+        // Upload original image to S3
+        const uploadParams = {
+          Bucket: S3_BUCKET,
+          Key: s3Key,
+          Body: file.buffer,
+          ContentType: file.mimetype
+        };
+        
+        await s3.upload(uploadParams).promise();
+        
+        // Create and upload thumbnail asynchronously (don't wait for it to complete upload response)
+        createThumbnailAndUpload(file.buffer, s3Key).catch(err => {
+          console.error(`Failed to create thumbnail for ${filename}:`, err);
         });
         
         processedFiles.push({
-          filename: file.filename,
+          filename: filename,
           originalname: file.originalname,
-          size: file.size
+          size: file.size,
+          s3Key: s3Key
         });
       } catch (error) {
         console.error(`Error processing file ${file.originalname}:`, error);

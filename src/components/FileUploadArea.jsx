@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Smartphone } from 'lucide-react';
 import './FileUploadArea.css';
 
 function FileUploadArea({ onFilesSelected }) {
@@ -44,7 +45,7 @@ function FileUploadArea({ onFilesSelected }) {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="upload-icon">📱</div>
+        <div className="upload-icon"><Smartphone size={48} /></div>
         <div className="upload-text">Tap to select images</div>
         <div className="upload-subtext">or drag and drop files here</div>
       </div>

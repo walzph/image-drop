@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { RefreshCw, Camera, CameraIcon, CheckSquare, Square, Download, MousePointer, Eye } from 'lucide-react';
+import { PhotoProvider, PhotoView } from 'react-photo-view';
+import 'react-photo-view/dist/react-photo-view.css';
 import './Gallery.css';
 
 function Gallery({ dropPath, onAddImages, onDownload }) {
-  const [images, setImages] = useState([]);
+  const [allImages, setAllImages] = useState([]); // All images from API
+  const [loadedImages, setLoadedImages] = useState([]); // Images currently displayed
   const [selectedImages, setSelectedImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const imagesPerLoad = 50;
 
   useEffect(() => {
     fetchImages();
@@ -20,13 +27,42 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
         throw new Error('Failed to load images');
       }
       const data = await response.json();
-      setImages(data.images);
+      setAllImages(data.images);
+      // Load initial batch of images
+      setLoadedImages(data.images.slice(0, imagesPerLoad));
+      // Clear selections when fetching new images
+      setSelectedImages([]);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const loadMoreImages = () => {
+    if (loadingMore || loadedImages.length >= allImages.length) return;
+    
+    setLoadingMore(true);
+    // Simulate slight delay for better UX
+    setTimeout(() => {
+      const nextBatch = allImages.slice(0, loadedImages.length + imagesPerLoad);
+      setLoadedImages(nextBatch);
+      setLoadingMore(false);
+    }, 200);
+  };
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + document.documentElement.scrollTop 
+          >= document.documentElement.offsetHeight - 1000) { // Load when 1000px from bottom
+        loadMoreImages();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadedImages.length, allImages.length, loadingMore]);
 
   const handleImageSelect = (filename) => {
     setSelectedImages(prev => 
@@ -36,11 +72,26 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
     );
   };
 
+  const handleImageClick = (filename) => {
+    if (isSelectMode) {
+      handleImageSelect(filename);
+    }
+    // If not in select mode, PhotoView will handle the fullscreen viewer
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    if (!isSelectMode) {
+      // Entering select mode - clear selections
+      setSelectedImages([]);
+    }
+  };
+
   const handleSelectAll = () => {
-    if (selectedImages.length === images.length) {
+    if (selectedImages.length === loadedImages.length) {
       setSelectedImages([]);
     } else {
-      setSelectedImages(images.map(img => img.filename));
+      setSelectedImages(loadedImages.map(img => img.filename));
     }
   };
 
@@ -71,7 +122,7 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
         <p>Error: {error}</p>
         <div className="button-row">
           <button className="btn btn-secondary" onClick={fetchImages}>
-            <span className="btn-icon">🔄</span>
+            <RefreshCw className="btn-icon" size={16} />
             Try Again
           </button>
         </div>
@@ -82,83 +133,140 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
   return (
     <div className="gallery-container">
       <div className="gallery-header">
-        <h2>Gallery ({images.length} images)</h2>
-        <div className="button-row">
-          <button className="btn" onClick={onAddImages}>
-            <span className="btn-icon">📷</span>
-            Add Your Images
-          </button>
-        </div>
+        <h2>Gallery ({allImages.length} images)</h2>
+        {loadedImages.length < allImages.length && (
+          <div className="scroll-info">
+            Showing {loadedImages.length} of {allImages.length} images
+          </div>
+        )}
       </div>
 
-      {images.length === 0 ? (
+      {allImages.length === 0 ? (
         <div className="gallery-empty">
           <p>No images uploaded yet</p>
           <div className="button-row">
             <button className="btn" onClick={onAddImages}>
-              <span className="btn-icon">📸</span>
+              <CameraIcon className="btn-icon" size={16} />
               Upload First Images
             </button>
           </div>
         </div>
       ) : (
         <>
-          <div className="button-row gallery-controls">
-            <button 
-              className="btn btn-secondary" 
-              onClick={handleSelectAll}
-            >
-              <span className="btn-icon">{selectedImages.length === images.length ? '☑️' : '☐'}</span>
-              {selectedImages.length === images.length ? 'Deselect All' : 'Select All'}
-            </button>
-            {selectedImages.length > 0 && (
+          <div className="gallery-actions">
+            <div className="button-row">
+              <button className="btn" onClick={onAddImages}>
+                <Camera className="btn-icon" size={16} />
+                Add Images
+              </button>
               <button 
-                className={`btn ${downloading ? 'downloading' : ''}`}
-                onClick={handleDownload}
-                disabled={downloading}
+                className={`btn ${isSelectMode ? 'btn-secondary' : ''}`}
+                onClick={toggleSelectMode}
               >
-                {downloading ? (
+                {isSelectMode ? (
                   <>
-                    <span className="spinner"></span>
-                    Preparing Download...
+                    <Eye className="btn-icon" size={16} />
+                    View Mode
                   </>
                 ) : (
                   <>
-                    <span className="btn-icon">💾</span>
-                    Download ({selectedImages.length})
+                    <MousePointer className="btn-icon" size={16} />
+                    Select
                   </>
                 )}
               </button>
-            )}
+              {isSelectMode && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleSelectAll}
+                >
+                  {selectedImages.length === loadedImages.length ? 
+                    <Square className="btn-icon" size={16} /> :
+                    <CheckSquare className="btn-icon" size={16} />
+                  }
+                  {selectedImages.length === loadedImages.length ? 'Deselect All' : `Select All (${loadedImages.length})`}
+                </button>
+              )}
+              {isSelectMode && (
+                <button 
+                  className={`btn ${downloading ? 'downloading' : ''} ${selectedImages.length === 0 ? 'btn-disabled' : ''}`}
+                  onClick={handleDownload}
+                  disabled={downloading || selectedImages.length === 0}
+                >
+                  {downloading ? (
+                    <>
+                      <span className="spinner"></span>
+                      Preparing Download...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="btn-icon" size={16} />
+                      Download {selectedImages.length > 0 ? `(${selectedImages.length})` : ''}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="gallery-grid">
-            {images.map((image) => (
-              <div 
-                key={image.filename} 
-                className={`gallery-item ${selectedImages.includes(image.filename) ? 'selected' : ''}`}
-                onClick={() => handleImageSelect(image.filename)}
-              >
-                <img 
-                  src={image.thumbnailUrl || image.url} 
-                  alt={image.filename}
-                  className="gallery-image"
-                  loading="lazy"
-                />
-                <div className="gallery-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedImages.includes(image.filename)}
-                    onChange={() => handleImageSelect(image.filename)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-                <div className="gallery-filename">
-                  {image.filename}
-                </div>
-              </div>
-            ))}
-          </div>
+          <PhotoProvider>
+            <div className="gallery-grid">
+              {allImages.map((image, globalIndex) => {
+                // Check if this image should be displayed (is it in loadedImages?)
+                const isLoaded = globalIndex < loadedImages.length;
+                
+                return (
+                  <div 
+                    key={image.filename} 
+                    className={`gallery-item ${isSelectMode && selectedImages.includes(image.filename) ? 'selected' : ''} ${isSelectMode ? 'select-mode' : 'view-mode'}`}
+                    onClick={() => handleImageClick(image.filename)}
+                    style={{ display: isLoaded ? 'block' : 'none' }}
+                  >
+                    {isSelectMode ? (
+                      <img 
+                        src={image.thumbnailUrl || image.url} 
+                        alt={image.filename}
+                        className="gallery-image"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <PhotoView 
+                        src={image.url}
+                        key={image.filename}
+                      >
+                        <img 
+                          src={image.thumbnailUrl || image.url} 
+                          alt={image.filename}
+                          className="gallery-image"
+                          loading="lazy"
+                        />
+                      </PhotoView>
+                    )}
+                    {isSelectMode && (
+                      <div className="gallery-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedImages.includes(image.filename)}
+                          onChange={() => handleImageSelect(image.filename)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
+                    <div className="gallery-filename">
+                      {image.filename}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </PhotoProvider>
+
+          {/* Loading indicator for infinite scroll */}
+          {loadingMore && (
+            <div className="loading-more">
+              <p>Loading more images...</p>
+            </div>
+          )}
         </>
       )}
     </div>

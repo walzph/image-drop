@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "nodemon backend/server.js",
-    "dev:frontend": "vite",
+    "dev:frontend": "vite --host",
     "build:frontend": "vite build",
     "preview:frontend": "vite preview",
     "start:production": "NODE_ENV=production node backend/server.js",
@@ -17,12 +17,16 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.35",
     "archiver": "^7.0.1",
+    "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.6.0",
     "express": "^4.18.2",
     "express-rate-limit": "^7.5.1",
+    "lucide-react": "^0.525.0",
     "multer": "^1.4.5-lts.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-photo-view": "^1.2.7",
     "react-router-dom": "^6.8.1",
     "sharp": "^0.34.2"
   },

@@ -1,4 +1,5 @@
 import React from 'react';
+import { CheckCircle, Camera, X, Clock, AlertCircle } from 'lucide-react';
 import './UploadProgress.css';
 
 function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }) {
@@ -10,12 +11,12 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
     <div className="progress-container">
       {isComplete && (
         <div className="success-message">
-          <h3>✅ Upload Complete!</h3>
+          <h3><CheckCircle className="inline-icon" size={20} /> Upload Complete!</h3>
           <p>All images have been uploaded successfully.</p>
           <div className="button-row">
             <button className="btn" onClick={onReset}>
-              <span className="btn-icon">📷</span>
-              Upload More Images
+              <Camera className="btn-icon" size={16} />
+              Back to Gallery
             </button>
           </div>
         </div>
@@ -33,8 +34,8 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
       {isUploading && onCancel && (
         <div className="button-row" style={{ marginBottom: '15px' }}>
           <button className="btn btn-secondary" onClick={onCancel}>
-            <span className="btn-icon">⏹️</span>
-            Cancel Upload
+            <X className="btn-icon" size={16} />
+            Cancel
           </button>
         </div>
       )}
@@ -50,11 +51,11 @@ function UploadProgress({ progress, isComplete, isUploading, onReset, onCancel }
         {progress.map((item, index) => (
           <div key={index} className={`file-item ${item.status}`}>
             <span className="file-icon">
-              {item.status === 'pending' && '⏳'}
-              {item.status === 'uploading' && '📸'}
-              {item.status === 'complete' && '✅'}
-              {item.status === 'failed' && '❌'}
-              {item.status === 'cancelled' && '⏹️'}
+              {item.status === 'pending' && <Clock size={16} />}
+              {item.status === 'uploading' && <Camera size={16} />}
+              {item.status === 'complete' && <CheckCircle size={16} />}
+              {item.status === 'failed' && <AlertCircle size={16} />}
+              {item.status === 'cancelled' && <X size={16} />}
             </span>
             <span className="file-name">{item.name}</span>
             <span className="file-status">{item.message}</span>

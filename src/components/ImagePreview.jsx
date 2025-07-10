@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Upload, Plus, X } from 'lucide-react';
 import './ImagePreview.css';
 
 function ImagePreview({ files, onRemoveFile, onAddMore, onStartUpload, onCancel }) {
@@ -44,15 +45,15 @@ function ImagePreview({ files, onRemoveFile, onAddMore, onStartUpload, onCancel 
       
       <div className="button-row upload-controls">
         <button className="btn" onClick={onStartUpload}>
-          <span className="btn-icon">☁️</span>
+          <Upload className="btn-icon" size={16} />
           Upload Images
         </button>
         <button className="btn btn-secondary" onClick={handleAddMoreClick}>
-          <span className="btn-icon">➕</span>
+          <Plus className="btn-icon" size={16} />
           Add More
         </button>
         <button className="btn btn-secondary" onClick={onCancel}>
-          <span className="btn-icon">✖️</span>
+          <X className="btn-icon" size={16} />
           Cancel
         </button>
       </div>

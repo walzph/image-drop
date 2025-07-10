@@ -1,0 +1,10 @@
+prepare:
+  steps:
+    - command: sudo n install 22
+    - command: sudo npm install -g @anthropic-ai/claude-code
+    - command: npm install
+test:
+  steps: []
+run:
+  steps:
+    - command: npm run dev

@@ -24,11 +24,14 @@ This is a React-based image drop application with a clear separation between fro
 ### Backend API (Node.js/Express)
 - **Location:** `backend/server.js`
 - **Port:** 3001
-- **Purpose:** File upload handling, image processing with Sharp.js, EXIF metadata preservation
+- **Purpose:** S3-based file upload handling, image processing with Sharp.js, EXIF metadata preservation
+- **Storage:** AWS S3 (configured for Hetzner Object Storage)
 - **Key APIs:**
   - `GET /api/config` - Returns all image drop configurations
   - `GET /api/drops/:path` - Returns specific image drop config
-  - `POST /api/upload/:path` - Handles file uploads with metadata preservation
+  - `GET /api/images/:path` - Returns list of uploaded images from S3
+  - `POST /api/upload/:path` - Handles file uploads to S3 with metadata preservation
+  - `POST /api/download/:path` - Creates ZIP downloads of selected images
 
 ### Frontend (React + Vite)
 - **Port:** 3000 (proxies `/api` calls to backend)
@@ -41,10 +44,11 @@ All image drops are configured in `config.json` with this structure:
 {
   "name": "Display Name",
   "path": "url-path",
-  "subdirectory": "uploads/folder",
   "backgroundImage": "/assets/image.jpg"
 }
 ```
+
+Note: The `subdirectory` field was removed when switching to S3 storage. Files are now stored in S3 with the `path` as the key prefix.
 
 ### Component Architecture
 - **ImageDropPage**: Main controller component managing upload state machine
@@ -53,10 +57,13 @@ All image drops are configured in `config.json` with this structure:
 - **UploadProgress**: Real-time progress tracking with status indicators
 
 ### File Upload Features
+- **S3 Storage**: Files uploaded to S3-compatible object storage (Hetzner)
 - **Filename Prefixing**: Files are saved as `{drop-path}-{timestamp}-{random}.ext`
+- **Thumbnail Generation**: Automatic thumbnail creation and upload to S3
 - **EXIF Preservation**: Sharp.js processes images while retaining metadata
 - **Mobile Optimization**: `capture="environment"` for camera access
 - **Duplicate Prevention**: Files checked by name and size when adding more
+- **Rate Limiting**: Download endpoint has relaxed rate limiting (20/min); upload rate limiting removed for S3 scalability
 
 ### State Management
 The upload flow uses a state machine in ImageDropPage:
