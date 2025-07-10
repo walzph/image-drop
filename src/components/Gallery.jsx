@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Camera, CameraIcon, CheckSquare, Square, Download, MousePointer, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, Camera, CameraIcon, CheckSquare, Square, Download, MousePointer, Eye } from 'lucide-react';
 import { PhotoProvider, PhotoView } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import './Gallery.css';
 
 function Gallery({ dropPath, onAddImages, onDownload }) {
-  const [allImages, setAllImages] = useState([]); // All images for PhotoProvider
+  const [allImages, setAllImages] = useState([]); // All images from API
+  const [loadedImages, setLoadedImages] = useState([]); // Images currently displayed
   const [selectedImages, setSelectedImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const imagesPerPage = 50;
+  const imagesPerLoad = 50;
 
   useEffect(() => {
     fetchImages();
-    setCurrentPage(1); // Reset to page 1 when dropPath changes
   }, [dropPath]);
 
   const fetchImages = async () => {
@@ -28,6 +28,8 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
       }
       const data = await response.json();
       setAllImages(data.images);
+      // Load initial batch of images
+      setLoadedImages(data.images.slice(0, imagesPerLoad));
       // Clear selections when fetching new images
       setSelectedImages([]);
     } catch (err) {
@@ -36,6 +38,31 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
       setLoading(false);
     }
   };
+
+  const loadMoreImages = () => {
+    if (loadingMore || loadedImages.length >= allImages.length) return;
+    
+    setLoadingMore(true);
+    // Simulate slight delay for better UX
+    setTimeout(() => {
+      const nextBatch = allImages.slice(0, loadedImages.length + imagesPerLoad);
+      setLoadedImages(nextBatch);
+      setLoadingMore(false);
+    }, 200);
+  };
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + document.documentElement.scrollTop 
+          >= document.documentElement.offsetHeight - 1000) { // Load when 1000px from bottom
+        loadMoreImages();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadedImages.length, allImages.length, loadingMore]);
 
   const handleImageSelect = (filename) => {
     setSelectedImages(prev => 
@@ -60,35 +87,11 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
     }
   };
 
-  // Client-side pagination calculations
-  const totalImages = allImages.length;
-  const totalPages = Math.ceil(totalImages / imagesPerPage);
-  const startIndex = (currentPage - 1) * imagesPerPage;
-  const endIndex = startIndex + imagesPerPage;
-  const currentPageImages = allImages.slice(startIndex, endIndex);
-  
-  const pagination = {
-    page: currentPage,
-    limit: imagesPerPage,
-    total: totalImages,
-    totalPages,
-    hasNext: currentPage < totalPages,
-    hasPrev: currentPage > 1
-  };
-
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      // Clear selections when changing pages
-      setSelectedImages([]);
-    }
-  };
-
   const handleSelectAll = () => {
-    if (selectedImages.length === currentPageImages.length) {
+    if (selectedImages.length === loadedImages.length) {
       setSelectedImages([]);
     } else {
-      setSelectedImages(currentPageImages.map(img => img.filename));
+      setSelectedImages(loadedImages.map(img => img.filename));
     }
   };
 
@@ -130,10 +133,10 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
   return (
     <div className="gallery-container">
       <div className="gallery-header">
-        <h2>Gallery ({pagination.total} images)</h2>
-        {pagination.totalPages > 1 && (
-          <div className="pagination-info">
-            Page {pagination.page} of {pagination.totalPages}
+        <h2>Gallery ({allImages.length} images)</h2>
+        {loadedImages.length < allImages.length && (
+          <div className="scroll-info">
+            Showing {loadedImages.length} of {allImages.length} images
           </div>
         )}
       </div>
@@ -177,11 +180,11 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
                   className="btn btn-secondary" 
                   onClick={handleSelectAll}
                 >
-                  {selectedImages.length === currentPageImages.length ? 
+                  {selectedImages.length === loadedImages.length ? 
                     <Square className="btn-icon" size={16} /> :
                     <CheckSquare className="btn-icon" size={16} />
                   }
-                  {selectedImages.length === currentPageImages.length ? 'Deselect All' : 'Select All'}
+                  {selectedImages.length === loadedImages.length ? 'Deselect All' : `Select All (${loadedImages.length})`}
                 </button>
               )}
               {isSelectMode && (
@@ -209,15 +212,15 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
           <PhotoProvider>
             <div className="gallery-grid">
               {allImages.map((image, globalIndex) => {
-                // Check if this image should be displayed on current page
-                const isOnCurrentPage = globalIndex >= startIndex && globalIndex < endIndex;
+                // Check if this image should be displayed (is it in loadedImages?)
+                const isLoaded = globalIndex < loadedImages.length;
                 
                 return (
                   <div 
                     key={image.filename} 
                     className={`gallery-item ${isSelectMode && selectedImages.includes(image.filename) ? 'selected' : ''} ${isSelectMode ? 'select-mode' : 'view-mode'}`}
                     onClick={() => handleImageClick(image.filename)}
-                    style={{ display: isOnCurrentPage ? 'block' : 'none' }}
+                    style={{ display: isLoaded ? 'block' : 'none' }}
                   >
                     {isSelectMode ? (
                       <img 
@@ -258,75 +261,10 @@ function Gallery({ dropPath, onAddImages, onDownload }) {
             </div>
           </PhotoProvider>
 
-          {/* Pagination Controls */}
-          {pagination.totalPages > 1 && (
-            <div className="pagination-controls">
-              
-              <div className="pagination-pages">
-
-              <button 
-                className="btn btn-secondary pagination-btn" 
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={!pagination.hasPrev}
-              >
-                <ChevronLeft className="btn-icon" size={16} />
-                Previous
-              </button>
-                {/* Show first page */}
-                {pagination.page > 3 && (
-                  <>
-                    <button 
-                      className="btn btn-secondary pagination-page" 
-                      onClick={() => handlePageChange(1)}
-                    >
-                      1
-                    </button>
-                    {pagination.page > 4 && <span className="pagination-ellipsis">...</span>}
-                  </>
-                )}
-                
-                {/* Show pages around current page */}
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  const startPage = Math.max(1, Math.min(pagination.page - 2, pagination.totalPages - 4));
-                  const pageNum = startPage + i;
-                  
-                  if (pageNum <= pagination.totalPages) {
-                    return (
-                      <button 
-                        key={pageNum}
-                        className={`btn pagination-page ${pageNum === pagination.page ? '' : 'btn-secondary'}`}
-                        onClick={() => handlePageChange(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  }
-                  return null;
-                })}
-                
-                {/* Show last page */}
-                {pagination.page < pagination.totalPages - 2 && (
-                  <>
-                    {pagination.page < pagination.totalPages - 3 && <span className="pagination-ellipsis">...</span>}
-                    <button 
-                      className="btn btn-secondary pagination-page" 
-                      onClick={() => handlePageChange(pagination.totalPages)}
-                    >
-                      {pagination.totalPages}
-                    </button>
-                  </>
-                )}
-
-              <button 
-                className="btn btn-secondary pagination-btn" 
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={!pagination.hasNext}
-              >
-                Next
-                <ChevronRight className="btn-icon" size={16} />
-              </button>
-              </div>
-              
+          {/* Loading indicator for infinite scroll */}
+          {loadingMore && (
+            <div className="loading-more">
+              <p>Loading more images...</p>
             </div>
           )}
         </>
