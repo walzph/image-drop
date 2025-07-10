@@ -2,21 +2,8 @@
   "imageDrops": [
     {
       "name": "Hochzeit Verena & Stefan",
-      "path": "verena-stefan",
-      "subdirectory": "uploads/verena-stefan",
-      "backgroundImage": "/assets/verena-stefan.webp"
-    },
-    {
-      "name": "Event Memories",
-      "path": "event-photos",
-      "subdirectory": "uploads/events",
-      "backgroundImage": "/assets/event-bg.jpg"
-    },
-    {
-      "name": "Family Gathering",
-      "path": "family-photos",
-      "subdirectory": "uploads/family",
-      "backgroundImage": "/assets/family-bg.jpg"
+      "path": "e744431f-b026-49a9-8aea-d3be177476bc",
+      "backgroundImage": "/assets/verena-stefan.jpg"
     }
   ]
 }
